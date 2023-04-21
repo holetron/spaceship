@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Космический корабль</title>
+  <style>
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background-color: black;
+    }
+    canvas {
+      border: 1px solid black;
+      background-color: black;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas" width="600" height="800"></canvas>
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let ship = {
+      x: canvas.width / 2,
+      y: canvas.height - 30,
+      width: 10,
+      height: 30
+    };
+
+    let obstacles = [];
+    let stars = [];
+    let distance = 0;
+    let interval;
+    let spawnRate = 0.01;
+    let obstacleSpeed = 2;
+
+    function createStars() {
+      for (let i = 0; i < 100; i++) {
+        const x = Math.random() * canvas.width;
+        const y = Math.random() * canvas.height;
+        const radius = Math.random() * 2;
+        const speed = Math.random() * 1;
+        stars.push({x, y, radius, speed});
+      }
+    }
+
+    function drawStar(x, y, radius) {
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fill();
+      ctx.closePath();
+    }
+
+    function lerpColor(a, b, amount) {
+  const ar = a >> 16;
+  const ag = (a >> 8) & 0xff;
+  const ab = a & 0xff;
+  const br = b >> 16;
+  const bg = (b >> 8) & 0xff;
+  const bb = b & 0xff;
+  const rr = ar + amount * (br - ar);
+  const rg = ag + amount * (bg - ag);
+  const rb = ab + amount * (bb - ab);
+  return (rr << 16) + (rg << 8) + (rb | 0);
+}
+
+    function drawShip() {
+  // Рисуем основную часть корабля
+  ctx.beginPath();
+  ctx.ellipse(ship.x, ship.y - ship.height / 2, ship.width / 2, ship.height / 2, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'gray';
+  ctx.fill();
+
+  // Рисуем кабину
+  ctx.beginPath();
+  ctx.ellipse(ship.x, ship.y - ship.height * 0.75, ship.width / 4, ship.height / 4, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'white';
+  ctx.fill();
+
+  // Рисуем двигатели
+  const engineRadius = ship.width / 2.4;
+  const engineOffset = ship.width / 1.2;
+  ctx.beginPath();
+  ctx.arc(ship.x - engineOffset, ship.y - engineRadius, engineRadius, 0, Math.PI * 2);
+  ctx.arc(ship.x + engineOffset, ship.y - engineRadius, engineRadius, 0, Math.PI * 2);
+  ctx.fillStyle = 'darkgray';
+  ctx.fill();
+
+  // Рисуем пламя
+  const flameColor = lerpColor(0xffa500, 0xffffff, (obstacleSpeed - 2) * 0.1);
+  ctx.beginPath();
+  ctx.moveTo(ship.x - engineOffset - engineRadius, ship.y);
+  ctx.lineTo(ship.x - engineOffset, ship.y + ship.height / 2);
+  ctx.lineTo(ship.x - engineOffset + engineRadius, ship.y);
+  ctx.moveTo(ship.x + engineOffset - engineRadius, ship.y);
+  ctx.lineTo(ship.x + engineOffset, ship.y + ship.height / 2);
+  ctx.lineTo(ship.x + engineOffset + engineRadius, ship.y);
+  ctx.fillStyle = `#${flameColor.toString(16)}`;
+  ctx.fill();
+}
+
+  
+
+    function drawObstacle(x, y, radius, color) {
+      ctx.beginPath();
+      ctx.arc(x, y, radius
+      , 0, Math.PI * 2);
+ctx.fillStyle = color;
+ctx.fill();
+ctx.closePath();
+}function randomPastelColor() {
+  const hue = Math.floor(Math.random() * 361);
+  return `hsl(${hue}, 100%, 85%)`;
+}
+
+function resetGame() {
+  clearInterval(interval);
+  obstacles = [];
+  stars = [];
+  distance = 0;
+  spawnRate = 0.01;
+  obstacleSpeed = 2;
+
+  createStars();
+  interval = setInterval(updateGame, 20);
+}
+
+function moveShip(event) {
+  const key = event.key;
+
+  if (key === 'ArrowLeft' && ship.x - ship.width / 2 > 0) {
+    ship.x -= 10;
+  } else if (key === 'ArrowRight' && ship.x + ship.width / 2 < canvas.width) {
+    ship.x += 10;
+  }
+}
+
+function handleTouch(event) {
+  const touchX = event.touches[0].clientX - canvas.getBoundingClientRect().left;
+
+  if (touchX < ship.x && ship.x - ship.width / 2 > 0) {
+    ship.x -= 10;
+  } else if (touchX > ship.x && ship.x + ship.width / 2 < canvas.width) {
+    ship.x += 10;
+  }
+}
+
+function explodeShip() {
+  const lines = 12;
+  const explosionRadius = ship.height / 1;
+
+  ctx.strokeStyle = 'orange';
+
+  for (let i = 0; i < lines; i++) {
+    const angle = (Math.PI * 2 / lines) * i;
+    const x2 = ship.x + ship.width / 2 + explosionRadius * Math.cos(angle);
+    const y2 = ship.y - ship.height / 2 + explosionRadius * Math.sin(angle);
+
+    ctx.beginPath();
+    ctx.moveTo(ship.x + ship.width / 2, ship.y - ship.height / 2);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  }
+}
+
+function updateGame() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  stars.forEach(star => {
+    star.y += star.speed;
+    if (star.y > canvas.height) {
+      star.y = 0;
+    }
+    drawStar(star.x, star.y, star.radius);
+  });
+
+  drawShip();
+
+  if (Math.random() < spawnRate) {
+    const radius = Math.random() * 25 + 5;
+    const x = Math.random() * (canvas.width - radius * 2) + radius;
+    const y = -radius; // Задаем начальное значение y
+    const color = randomPastelColor();
+    obstacles.push({ x, y, radius, color });
+  }
+
+  for (let i = 0; i < obstacles.length; i++) {
+    const obstacle = obstacles[i];
+    obstacle.y += obstacleSpeed;
+
+    if (obstacle.y - obstacle.radius > canvas.height) {
+      obstacles.splice(i, 1);
+      i--;
+      distance += 10;
+
+      // Увеличиваем скорость и частоту появления комет
+      if (distance % 100 === 30) {
+        spawnRate += 0.01;
+        obstacleSpeed += 20;
+      }
+    } else {
+      drawObstacle(obstacle.x, obstacle.y, obstacle.radius, obstacle.color);
+
+      if (Math.sqrt((ship.x + ship.width / 2 - obstacle.x) ** 2 + (ship.y - ship.height / 2 - obstacle.y)
+      ** 2) <= ship.height / 2 + obstacle.radius) {
+explodeShip();
+clearInterval(interval);        setTimeout(() => {
+          if (confirm(`You died! Your score ${distance} pc. Game again?`)) {
+            resetGame();
+          }
+        }, 500);
+      }
+    }
+  }
+}
+
+document.addEventListener('keydown', moveShip);
+canvas.addEventListener('touchstart', handleTouch, { passive: true });
+createStars();
+interval = setInterval(updateGame, 20);
+</script>
+</body>
+</html>
